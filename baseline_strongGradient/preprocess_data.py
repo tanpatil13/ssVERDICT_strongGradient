@@ -126,7 +126,7 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
                     b0_indices.append(i)
 
             image_data_flattened_masked = flatten_mask_data(image_data, mask=image_mask)
-            image_data_flattened_masked = np.clip(image_data_flattened_masked, 1e-6, None)
+            # image_data_flattened_masked = np.clip(image_data_flattened_masked, 1e-6, None)
             # x_bvec_data_flattened = flatten_mask_data(x_bvec_data)
             # y_bvec_data_flattened = flatten_mask_data(y_bvec_data)
             # z_bvec_data_flattened = flatten_mask_data(z_bvec_data)
@@ -136,12 +136,14 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             avg_image_data = np.zeros((image_data_flattened_masked.shape[0], len(th_bvals)))
             for i in range(len(th_bvals)):
                 avg_image_data[:, i] = np.mean(image_data_flattened_masked[:, ac_th_bvals_map == i], axis=1)
+            
+            avg_image_data = np.clip(avg_image_data, 0, None)
 
             norm_avg_image_data = np.zeros_like(avg_image_data)
 
             for i in range(avg_image_data.shape[1]):
 
-                norm_avg_image_data[:, i] = avg_image_data[:, i] / avg_image_data[:, 0]  # Normalize by the first b-value (b0)
+                norm_avg_image_data[:, i] = avg_image_data[:, i] / (avg_image_data[:, 0] + 1e-6)  # Normalize by the first b-value (b0)
 
             norm_avg_image_data = np.clip(norm_avg_image_data, None, 1-(1e-6))
             preprocessed_image_data.extend(norm_avg_image_data)
