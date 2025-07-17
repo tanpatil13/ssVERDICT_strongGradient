@@ -9,8 +9,10 @@ from autoencoder_model import ssVERDICT_NN
 from postprocess_data import generate_param_maps
 
 
-# Set random seed/state for better reproducibility
 def set_random_state(seed):
+    """
+    Set random seed/state for better reproducibility
+    """
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
