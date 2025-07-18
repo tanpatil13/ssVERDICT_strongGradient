@@ -132,22 +132,11 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             norm_y_bvec_data = y_bvec_data / (ac_bvals + 1e-9)
             norm_z_bvec_data = z_bvec_data / (ac_bvals + 1e-9)
 
-            # print(norm_x_bvec_data[84,84,7,10]**2 + norm_y_bvec_data[84,84,7,10]**2 + norm_z_bvec_data[84,84,7,10]**2)
-            # print(norm_x_bvec_data.min(), norm_x_bvec_data.max())
-            # print(norm_y_bvec_data.min(), norm_y_bvec_data.max())
-            # print(norm_z_bvec_data.min(), norm_z_bvec_data.max())
-
             image_data_flattened_masked = flatten_mask_data(image_data, mask=image_mask)
-            # image_data_flattened_masked = np.clip(image_data_flattened_masked, 1e-6, None)
             x_bvec_data_flattened_masked = flatten_mask_data(norm_x_bvec_data, mask=image_mask)
             y_bvec_data_flattened_masked = flatten_mask_data(norm_y_bvec_data, mask=image_mask)
             z_bvec_data_flattened_masked = flatten_mask_data(norm_z_bvec_data, mask=image_mask)
             
-            # print(x_bvec_data_flattened_masked.min(), x_bvec_data_flattened_masked.max())
-            # print(y_bvec_data_flattened_masked.min(), y_bvec_data_flattened_masked.max())
-            # print(z_bvec_data_flattened_masked.min(), z_bvec_data_flattened_masked.max())
-            # print(x_bvec_data_flattened_masked[:,5:8]**2 + y_bvec_data_flattened_masked[:,5:8]**2 + z_bvec_data_flattened_masked[:,5:8]**2)
-
             mean_ac_bvals = np.mean(flattened_ac_bvals, axis=0)
             ac_th_bvals_map = calculate_closest_idx(th_bvals, mean_ac_bvals)
 
@@ -162,20 +151,10 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
                 norm_avg_z_bvec_data[:, i] = np.mean(z_bvec_data_flattened_masked[:, ac_th_bvals_map == i], axis=1)
                 norm_avg_x_bvec_data[:, i] = np.mean(x_bvec_data_flattened_masked[:, ac_th_bvals_map == i], axis=1)
             
-            # print(norm_avg_x_bvec_data.min(), norm_avg_x_bvec_data.max())
-            # print(norm_avg_y_bvec_data.min(), norm_avg_y_bvec_data.max())
-            # print(norm_avg_z_bvec_data.min(), norm_avg_z_bvec_data.max())
-
             norm_avg = np.sqrt(norm_avg_x_bvec_data**2 + norm_avg_y_bvec_data**2 + norm_avg_z_bvec_data**2) + 1e-9
             norm_avg_x_bvec_data /= norm_avg
             norm_avg_y_bvec_data /= norm_avg
             norm_avg_z_bvec_data /= norm_avg
-
-            # print(norm_avg_x_bvec_data.min(), norm_avg_x_bvec_data.max())
-            # print(norm_avg_y_bvec_data.min(), norm_avg_y_bvec_data.max())
-            # print(norm_avg_z_bvec_data.min(), norm_avg_z_bvec_data.max())
-
-            # print(norm_avg_x_bvec_data**2 + norm_avg_y_bvec_data**2 + norm_avg_z_bvec_data**2)
 
             avg_image_data = np.clip(avg_image_data, 0, None)
 
@@ -184,8 +163,6 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             for i in range(avg_image_data.shape[1]):
                 norm_avg_image_data[:, i] = avg_image_data[:, i] / (avg_image_data[:, 0] + 1e-6)  # Normalize by the first b-value (b0)
 
-            
-
             norm_avg_image_data = np.clip(norm_avg_image_data, None, 1-(1e-6))
             preprocessed_image_data.extend(norm_avg_image_data)
 
@@ -193,10 +170,7 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             preprocessed_y_bvec_data.extend(norm_avg_y_bvec_data)
             preprocessed_z_bvec_data.extend(norm_avg_z_bvec_data)
 
-            # preprocessed_bvec_data = np.stack((avg_x_bvec_data, avg_y_bvec_data, avg_z_bvec_data), axis=2)
-
     preprocessed_image_data = np.array(preprocessed_image_data)
     preprocessed_bvec_data = np.stack((np.array(preprocessed_x_bvec_data), np.array(preprocessed_y_bvec_data), np.array(preprocessed_z_bvec_data)), axis=2)
-
 
     return ac_bvals, preprocessed_image_data, image_dim, image_mask, preprocessed_bvec_data

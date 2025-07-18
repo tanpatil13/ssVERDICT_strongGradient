@@ -1,5 +1,6 @@
 import numpy as np
 import torch, torch.nn as nn
+from torchinfo import summary
 import matplotlib.pyplot as plt
 import random
 import os
@@ -346,6 +347,9 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     criterion = nn.MSELoss()
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.1)
+
+    print("Model Summary: ")
+    print(summary(model, input_data=(next(iter(train_dataloader))[0].to(device), next(iter(train_dataloader))[1])))
 
     train_losses, val_losses, best_train_param_estimates, best_val_param_estimates, best_checkpoint_path = train_model(
         model=model,
