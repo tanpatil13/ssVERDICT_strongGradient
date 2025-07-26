@@ -15,4 +15,4 @@ There are five directories each pertaining to a fitting strategy, i.e. combinati
 
 To run the training and inference pipeline, and generate the biomarker parameter maps:
 1) Execute the **run_model_fitting.sh** script with an argument specifying the directory name for the fitting method to be executed
-2) For e.g., $_**./run_model_fitting.sh "dense-MLP"**_
+2) For e.g., $ _**./run_model_fitting.sh "dense-MLP"**_
