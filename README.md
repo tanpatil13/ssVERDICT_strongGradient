@@ -10,8 +10,8 @@ There are six directories each pertaining to a fitting strategy, i.e. different 
 1) baseline: VERDICT model fitted using the baseline autoencoder architecture discussed in the above-mentioned publication
 2) dense-MLP: VERDICT model fitted using a more complex self-supervised MLP architecture than the baseline model
 3) cnn-UNet: VERDICT model fitted using a CNN-based self-supervised UNet architecture
-4) 1D-DKI: 1-dimensional DKI fitted using a self-supervised MLP architecture
-5) 3D-DKI: 3-dimensional DKI fitted using a self-supervised MLP architecture
+4) dki-1D: 1-dimensional DKI fitted using a self-supervised MLP architecture
+5) dki-3D: 3-dimensional DKI fitted using a self-supervised MLP architecture
 6) NLLS: VERDICT model fitted using the non-linear least square based Levenberg-Marquardt method
 
 To run the training and inference pipeline, and generate the biomarker parameter maps:
