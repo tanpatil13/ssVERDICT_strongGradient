@@ -50,19 +50,24 @@ def create_dataloaders(train_preprocessed_image_data, val_preprocessed_image_dat
 
     return train_dataloader, val_dataloader, healthy_test_dataloader, patient_test_dataloader
 
-def create_single_dataloader(preprocessed_image_data, batch_size=256, shuffle=False):
+def create_single_dataloader(image_dataset, batch_size=256, shuffle=False):
     """
     Create a single dataloader for a given preprocessed image dataset.
     """
 
     dataloader = torch.utils.data.DataLoader(
-        dataset=torch.from_numpy(preprocessed_image_data.astype(np.float32)),
+        dataset=image_dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         # num_workers=4
     )
 
     return dataloader
+
+def get_prostate_mask_path(grad_dataset_dir, prostate_mask_dir):
+    for subject_type, subject_ids in prostate_mask_dir.items():
+        for subject_id in subject_ids:
+            return os.path.join(grad_dataset_dir, subject_type, subject_id)
 
 def train_single_epoch(model, train_dataloader, criterion, optimizer, device='cuda'):
     """
@@ -140,7 +145,7 @@ def val_test_model(split_type, model, val_test_dataloader, criterion, device='cu
 
     return epoch_val_test_loss, all_D_pred, all_W_pred
 
-def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", scheduler=None):
+def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", scheduler=None, target_dir=""):
     """
     Train the self-supervised autoencoder model.
     Validate the model on the validation dataset after each epoch.
@@ -154,6 +159,8 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
         num_epochs: Number of epochs to train the model.
         device: Device to run the model on (default is 'cuda').
         timestamp: Timestamp for saving model checkpoints.
+        scheduler: Learning rate scheduler (default is None).
+        target_dir: Directory to save the model outputs.
     Returns:
         train_losses: List of training losses for each epoch.
         val_losses: List of validation losses for each epoch.
@@ -185,6 +192,8 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
             }
 
         model_save_dir_path = "model_save_directory"
+        if target_dir != "" and timestamp != "":
+            model_save_dir_path = target_dir + f"/model_output_directory/{timestamp}/model_save_directory"
         if not os.path.exists(model_save_dir_path):
             os.makedirs(model_save_dir_path)
 
@@ -219,13 +228,14 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
 
     return train_losses, val_losses, best_train_param_estimates, best_val_param_estimates, best_checkpoint_path
 
-def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp):
+def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, target_dir):
     """
     Plot the training and validation loss curves.
     Args:
         train_losses: List of training losses for each epoch.
         val_losses: List of validation losses for each epoch.
         timestamp: Timestamp for saving the plot.
+        target_dir: Directory to save the plot.
     """
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Train Loss', color='blue')
@@ -237,12 +247,12 @@ def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp):
     plt.grid(True)
     plt.show()
 
-    plt.savefig(timestamp + f'/ssDKI_3D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
 def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, healthy_test_data_dir, patient_test_data_dir,
                                 patient_1_data_dir, patient_2_data_dir, patient_3_data_dir, patient_5_data_dir,
                                 image_file_pattern, x_bvec_file_pattern, y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern,
-                                th_bvals, th_gradient_strength, timestamp):
+                                th_bvals, th_gradient_strength, timestamp, target_dir):
     """
     Preprocess the images, create dataloaders, train the self-supervised 3-D DKI autoencoder model, validate and test it.
     Generate the estimated parameter maps for MD, FA, MK, AK and RK for both healthy controls and patients.
@@ -261,6 +271,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
         th_bvals: List of b-values in ms/µm^2.
         th_gradient_strength: Theoretical maximum gradient strength in mT/m.
         timestamp: Timestamp for saving model checkpoints and plots.
+        target_dir: Directory to train the model and save the outputs.
     """
 
     _, train_preprocessed_image_data, _, train_image_mask, train_preprocessed_bvec_data = preprocess_images(train_data_dir,
@@ -275,7 +286,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
 
-    _,  patient_test_preprocessed_image_data, _, patient_test_image_mask, patient_test_preprocessed_bvec_data = preprocess_images(patient_test_data_dir,
+    _, patient_test_preprocessed_image_data, _, patient_test_image_mask, patient_test_preprocessed_bvec_data = preprocess_images(patient_test_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
 
@@ -303,7 +314,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.1)
 
     print("Model Summary: ")
-    print(summary(model, input_data=(next(iter(train_dataloader))[0].to(device), next(iter(train_dataloader))[1])))
+    summary(model, input_data=(next(iter(train_dataloader))[0].to(device), next(iter(train_dataloader))[1]))
 
     train_losses, val_losses, best_train_param_estimates, best_val_param_estimates, best_checkpoint_path = train_model(
         model=model,
@@ -313,16 +324,18 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
         optimizer=optimizer,
         num_epochs=num_epochs,
         device=device,
-        scheduler=scheduler
+        scheduler=scheduler,
+        timestamp=timestamp,
+        target_dir=target_dir
     )
 
-    plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp)
+    plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, target_dir)
 
     print("Training and Validation completed.")
 
     print("Loading best model for inference...")
 
-    model.load_state_dict(torch.load(best_checkpoint_path)['model_state_dict'])
+    model.load_state_dict(torch.load(best_checkpoint_path, weights_only=True)['model_state_dict'])
 
     print("Beginning inference on healthy controls and patients in the test set...")
 
@@ -332,68 +345,78 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     healthy_test_FA = compute_FA(np.array(healthy_test_W_pred))
     healthy_test_MD, healthy_test_MK, healthy_test_AK, healthy_test_RK = compute_KurtosisMetrics(np.array(healthy_test_D_pred), np.array(healthy_test_W_pred))
     healthy_test_MD_map, healthy_test_FA_map, healthy_test_MK_map, healthy_test_AK_map, healthy_test_RK_map \
-        = generate_param_maps(healthy_test_MD, healthy_test_FA, healthy_test_MK, healthy_test_AK, healthy_test_RK, healthy_test_image_mask, th_gradient_strength, timestamp, 7, "healthy")
+        = generate_param_maps(healthy_test_MD, healthy_test_FA, healthy_test_MK, healthy_test_AK, healthy_test_RK, healthy_test_image_mask, th_gradient_strength, timestamp, target_dir, 7, "healthy")
 
     patient_test_loss, patient_test_D_pred, patient_test_W_pred = val_test_model("Test", model, patient_test_dataloader, criterion, device)
     print(f"Patient Test Loss: {patient_test_loss}")
 
     patient_test_FA = compute_FA(np.array(patient_test_W_pred))
     patient_test_MD, patient_test_MK, patient_test_AK, patient_test_RK = compute_KurtosisMetrics(np.array(patient_test_D_pred), np.array(patient_test_W_pred))
+    patient_test_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_test_data_dir)
     patient_test_MD_map, patient_test_FA_map, patient_test_MK_map, patient_test_AK_map, patient_test_RK_map \
-        = generate_param_maps(patient_test_MD, patient_test_FA, patient_test_MK, patient_test_AK, patient_test_RK, patient_test_image_mask, th_gradient_strength, timestamp, 8, "patient", "4", patient_test_data_dir, prostate_mask_file_pattern)
+        = generate_param_maps(patient_test_MD, patient_test_FA, patient_test_MK, patient_test_AK, patient_test_RK, patient_test_image_mask, th_gradient_strength, timestamp, target_dir, 8, "patient", "4", patient_test_prostate_mask_path, prostate_mask_file_pattern)
 
     print("Inference on test set completed.")
 
     print("Beginning inference on individual patients...")
 
-    _, patient_1_preprocessed_image_data, _, patient_1_image_mask = preprocess_images(patient_1_data_dir,
+    _, patient_1_preprocessed_image_data, _, patient_1_image_mask, patient_1_preprocessed_bvec_data = preprocess_images(patient_1_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
-    _, patient_2_preprocessed_image_data, _, patient_2_image_mask = preprocess_images(patient_2_data_dir,
+    _, patient_2_preprocessed_image_data, _, patient_2_image_mask, patient_2_preprocessed_bvec_data = preprocess_images(patient_2_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
-    _, patient_3_preprocessed_image_data, _, patient_3_image_mask = preprocess_images(patient_3_data_dir,
+    _, patient_3_preprocessed_image_data, _, patient_3_image_mask, patient_3_preprocessed_bvec_data = preprocess_images(patient_3_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
-    _, patient_5_preprocessed_image_data, _, patient_5_image_mask = preprocess_images(patient_5_data_dir,
+    _, patient_5_preprocessed_image_data, _, patient_5_image_mask, patient_5_preprocessed_bvec_data = preprocess_images(patient_5_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                                 y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
     
-    patient_1_dataloader = create_single_dataloader(patient_1_preprocessed_image_data, batch_size)
-    patient_2_dataloader = create_single_dataloader(patient_2_preprocessed_image_data, batch_size)
-    patient_3_dataloader = create_single_dataloader(patient_3_preprocessed_image_data, batch_size)
-    patient_5_dataloader = create_single_dataloader(patient_5_preprocessed_image_data, batch_size)
+    patient_1_dataset = StrongGradientDataset(patient_1_preprocessed_image_data.astype(np.float32), patient_1_preprocessed_bvec_data.astype(np.float32))
+    patient_2_dataset = StrongGradientDataset(patient_2_preprocessed_image_data.astype(np.float32), patient_2_preprocessed_bvec_data.astype(np.float32))
+    patient_3_dataset = StrongGradientDataset(patient_3_preprocessed_image_data.astype(np.float32), patient_3_preprocessed_bvec_data.astype(np.float32))
+    patient_5_dataset = StrongGradientDataset(patient_5_preprocessed_image_data.astype(np.float32), patient_5_preprocessed_bvec_data.astype(np.float32))
+    
+    patient_1_dataloader = create_single_dataloader(patient_1_dataset, batch_size)
+    patient_2_dataloader = create_single_dataloader(patient_2_dataset, batch_size)
+    patient_3_dataloader = create_single_dataloader(patient_3_dataset, batch_size)
+    patient_5_dataloader = create_single_dataloader(patient_5_dataset, batch_size)
 
     patient_1_test_loss, patient_1_D_pred, patient_1_W_pred = val_test_model("Test", model, patient_1_dataloader, criterion, device)
     print(f"Patient 1 Test Loss: {patient_1_test_loss}")
 
     patient_1_FA = compute_FA(np.array(patient_1_W_pred))
     patient_1_MD, patient_1_MK, patient_1_AK, patient_1_RK = compute_KurtosisMetrics(np.array(patient_1_D_pred), np.array(patient_1_W_pred))
+    patient_1_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_1_data_dir)
     patient_1_MD_map, patient_1_FA_map, patient_1_MK_map, patient_1_AK_map, patient_1_RK_map \
-        = generate_param_maps(patient_1_MD, patient_1_FA, patient_1_MK, patient_1_AK, patient_1_RK, patient_1_image_mask, th_gradient_strength, timestamp, 5, "patient", "1", patient_1_data_dir, prostate_mask_file_pattern)
-    
+        = generate_param_maps(patient_1_MD, patient_1_FA, patient_1_MK, patient_1_AK, patient_1_RK, patient_1_image_mask, th_gradient_strength, timestamp, target_dir, 5, "patient", "1", patient_1_prostate_mask_path, prostate_mask_file_pattern)
+
     patient_2_test_loss, patient_2_D_pred, patient_2_W_pred = val_test_model("Test", model, patient_2_dataloader, criterion, device)
     print(f"Patient 2 Test Loss: {patient_2_test_loss}")
 
     patient_2_FA = compute_FA(np.array(patient_2_W_pred))
     patient_2_MD, patient_2_MK, patient_2_AK, patient_2_RK = compute_KurtosisMetrics(np.array(patient_2_D_pred), np.array(patient_2_W_pred))
+    patient_2_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_2_data_dir)
     patient_2_MD_map, patient_2_FA_map, patient_2_MK_map, patient_2_AK_map, patient_2_RK_map \
-        = generate_param_maps(patient_2_MD, patient_2_FA, patient_2_MK, patient_2_AK, patient_2_RK, patient_2_image_mask, th_gradient_strength, timestamp, 7, "patient", "2", patient_2_data_dir, prostate_mask_file_pattern)
-    
+        = generate_param_maps(patient_2_MD, patient_2_FA, patient_2_MK, patient_2_AK, patient_2_RK, patient_2_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "2", patient_2_prostate_mask_path, prostate_mask_file_pattern)
+
     patient_3_test_loss, patient_3_D_pred, patient_3_W_pred = val_test_model("Test", model, patient_3_dataloader, criterion, device)
     print(f"Patient 3 Test Loss: {patient_3_test_loss}")
 
     patient_3_FA = compute_FA(np.array(patient_3_W_pred))
     patient_3_MD, patient_3_MK, patient_3_AK, patient_3_RK = compute_KurtosisMetrics(np.array(patient_3_D_pred), np.array(patient_3_W_pred))
+    patient_3_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_3_data_dir)
     patient_3_MD_map, patient_3_FA_map, patient_3_MK_map, patient_3_AK_map, patient_3_RK_map \
-        = generate_param_maps(patient_3_MD, patient_3_FA, patient_3_MK, patient_3_AK, patient_3_RK, patient_3_image_mask, th_gradient_strength, timestamp, 6, "patient", "3", patient_3_data_dir, prostate_mask_file_pattern)
-    
+        = generate_param_maps(patient_3_MD, patient_3_FA, patient_3_MK, patient_3_AK, patient_3_RK, patient_3_image_mask, th_gradient_strength, timestamp, target_dir, 6, "patient", "3", patient_3_prostate_mask_path, prostate_mask_file_pattern)
+
     patient_5_test_loss, patient_5_D_pred, patient_5_W_pred = val_test_model("Test", model, patient_5_dataloader, criterion, device)
     print(f"Patient 5 Test Loss: {patient_5_test_loss}")
 
     patient_5_FA = compute_FA(np.array(patient_5_W_pred))
     patient_5_MD, patient_5_MK, patient_5_AK, patient_5_RK = compute_KurtosisMetrics(np.array(patient_5_D_pred), np.array(patient_5_W_pred))
+    patient_5_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_5_data_dir)
     patient_5_MD_map, patient_5_FA_map, patient_5_MK_map, patient_5_AK_map, patient_5_RK_map \
-        = generate_param_maps(patient_5_MD, patient_5_FA, patient_5_MK, patient_5_AK, patient_5_RK, patient_5_image_mask, th_gradient_strength, timestamp, 7, "patient", "5", patient_5_data_dir, prostate_mask_file_pattern)
+        = generate_param_maps(patient_5_MD, patient_5_FA, patient_5_MK, patient_5_AK, patient_5_RK, patient_5_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "5", patient_5_prostate_mask_path, prostate_mask_file_pattern)
 
     print("Inference on individual patients completed.")

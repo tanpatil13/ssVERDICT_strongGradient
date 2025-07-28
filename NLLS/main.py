@@ -30,7 +30,7 @@ def get_diffusion_parameters(th_bvals, gamma, th_gradient_strength):
 
     return Delta, delta, gradient_strength
 
-def main(timestamp):
+def main(timestamp, target_dir):
 
     patient_data_dir = {
         'patient_data': ['170622-602']
@@ -60,7 +60,7 @@ def main(timestamp):
     y_bvec_G40_file_pattern = re.compile(rf'{G40_file_pattern}_mod_y{file_extension_pattern}')
     z_bvec_G40_file_pattern = re.compile(rf'{G40_file_pattern}_mod_z{file_extension_pattern}')
 
-    prostate_mask_file_pattern = "prostate_mask.nii.gz"
+    prostate_mask_file_pattern = re.compile(r'prostate_mask.nii.gz')
 
     th_bvals = [1e-3, 50, 500, 1500, 2000, 3000]
     gamma = 2.675987e2  # rad/ms/mT, gyromagnetic ratio for hydrogen
@@ -79,7 +79,8 @@ def main(timestamp):
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G300',
-        timestamp=timestamp
+        timestamp=timestamp,
+        target_dir=target_dir
     )
 
     perform_fit(
@@ -93,7 +94,8 @@ def main(timestamp):
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G80',
-        timestamp=timestamp
+        timestamp=timestamp,
+        target_dir=target_dir
     )
 
     perform_fit(
@@ -107,15 +109,16 @@ def main(timestamp):
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G40',
-        timestamp=timestamp
+        timestamp=timestamp,
+        target_dir=target_dir
     )
 
 if __name__ == "__main__":
     """
-    Entry point for the script. Expects a timestamp argument to be passed.
-    Raises a ValueError if the timestamp argument is not provided.
+    Entry point for the script. Expects a timestamp argument to be passed along with the target directory.
+    Raises a ValueError if the timestamp and target directory arguments are not provided.
     """
-    if len(sys.argv) < 2:
-        raise ValueError("Timestamp argument required")
-    main(sys.argv[1])
+    if len(sys.argv) < 3:
+        raise ValueError("Timestamp and target directory arguments are both required")
+    main(sys.argv[1], sys.argv[2])
 

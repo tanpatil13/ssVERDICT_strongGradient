@@ -46,6 +46,11 @@ def create_single_dataloader(preprocessed_image_data, batch_size=256, shuffle=Fa
 
     return dataloader
 
+def get_prostate_mask_path(grad_dataset_dir, prostate_mask_dir):
+    for subject_type, subject_ids in prostate_mask_dir.items():
+        for subject_id in subject_ids:
+            return os.path.join(grad_dataset_dir, subject_type, subject_id)
+
 def train_single_epoch(model, train_dataloader, criterion, optimizer, device='cuda'):
     """
     Train the model for a single epoch.
@@ -122,7 +127,7 @@ def val_test_model(split_type, model, val_test_dataloader, criterion, device='cu
 
     return epoch_val_test_loss, all_D_k_pred, all_K_pred
 
-def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", scheduler=None):
+def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", scheduler=None, target_dir=""):
     """
     Train the self-supervised autoencoder model.
     Validate the model on the validation dataset after each epoch.
@@ -136,6 +141,8 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
         num_epochs: Number of epochs to train the model.
         device: Device to run the model on (default is 'cuda').
         timestamp: Timestamp for saving model checkpoints.
+        scheduler: Learning rate scheduler (default is None).
+        target_dir: Directory to save the model outputs.
     Returns:
         train_losses: List of training losses for each epoch.
         val_losses: List of validation losses for each epoch.
@@ -167,6 +174,8 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
             }
 
         model_save_dir_path = "model_save_directory"
+        if target_dir != "" and timestamp != "":
+            model_save_dir_path = target_dir + f"/model_output_directory/{timestamp}/model_save_directory"
         if not os.path.exists(model_save_dir_path):
             os.makedirs(model_save_dir_path)
 
@@ -201,13 +210,14 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
 
     return train_losses, val_losses, best_train_param_estimates, best_val_param_estimates, best_checkpoint_path
 
-def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp):
+def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, target_dir):
     """
     Plot the training and validation loss curves.
     Args:
         train_losses: List of training losses for each epoch.
         val_losses: List of validation losses for each epoch.
         timestamp: Timestamp for saving the plot.
+        target_dir: Directory to save the plot.
     """
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Train Loss', color='blue')
@@ -219,12 +229,12 @@ def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp):
     plt.grid(True)
     plt.show()
 
-    plt.savefig(timestamp + f'/ssDKI_1D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_1D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
 def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, healthy_test_data_dir, patient_test_data_dir,
                                 patient_1_data_dir, patient_2_data_dir, patient_3_data_dir, patient_5_data_dir,
                                 image_file_pattern, x_bvec_file_pattern, y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern,
-                                th_bvals, th_gradient_strength, timestamp):
+                                th_bvals, th_gradient_strength, timestamp, target_dir):
     """
     Preprocess the images, create dataloaders, train the self-supervised 1-D DKI autoencoder model, validate and test it.
     Generate the estimated parameter maps for D_k and K for both healthy controls and patients.
@@ -243,6 +253,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
         th_bvals: List of b-values in ms/µm^2.
         th_gradient_strength: Theoretical maximum gradient strength in mT/m.
         timestamp: Timestamp for saving model checkpoints and plots.
+        target_dir: Directory to train the model and save the outputs.
     """
 
     _, train_preprocessed_image_data, _, train_image_mask = preprocess_images(train_data_dir,
@@ -257,7 +268,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                             y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
 
-    _,  patient_test_preprocessed_image_data, _, patient_test_image_mask = preprocess_images(patient_test_data_dir,
+    _, patient_test_preprocessed_image_data, _, patient_test_image_mask = preprocess_images(patient_test_data_dir,
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
                                                             y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
 
@@ -280,7 +291,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
 
     print("Model Summary: ")
-    print(summary(model, input_data=next(iter(train_dataloader))[0].to(device)))
+    summary(model, input_size=(batch_size, len(th_bvals_scaled)), device=device.type)
 
     train_losses, val_losses, best_train_param_estimates, best_val_param_estimates, best_checkpoint_path = train_model(
         model=model,
@@ -291,28 +302,30 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
         num_epochs=num_epochs,
         device=device,
         timestamp=timestamp,
-        scheduler=scheduler
+        scheduler=scheduler,
+        target_dir=target_dir
     )
 
-    plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp)
+    plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, target_dir)
 
     print("Training and Validation completed.")
 
     print("Loading best model for inference...")
 
-    model.load_state_dict(torch.load(best_checkpoint_path)['model_state_dict'])
+    model.load_state_dict(torch.load(best_checkpoint_path, weights_only=True)['model_state_dict'])
 
     print("Beginning inference on healthy controls and patients in the test set...")
 
     healthy_test_loss, healthy_test_D_k_pred, healthy_test_K_pred = val_test_model("Test", model, healthy_test_dataloader, criterion, device)
     print(f"Healthy Control Test Loss: {healthy_test_loss}")
 
-    healthy_test_D_k_map, healthy_test_K_map = generate_param_maps(healthy_test_D_k_pred, healthy_test_K_pred, healthy_test_image_mask, th_gradient_strength, timestamp, 7, "healthy")
+    healthy_test_D_k_map, healthy_test_K_map = generate_param_maps(healthy_test_D_k_pred, healthy_test_K_pred, healthy_test_image_mask, th_gradient_strength, timestamp, target_dir, 7, "healthy")
 
     patient_test_loss, patient_test_D_k_pred, patient_test_K_pred = val_test_model("Test", model, patient_test_dataloader, criterion, device)
     print(f"Patient Test Loss: {patient_test_loss}")
 
-    patient_test_D_k_map, patient_test_K_map = generate_param_maps(patient_test_D_k_pred, patient_test_K_pred, patient_test_image_mask, th_gradient_strength, timestamp, 8, "patient", "4", patient_test_data_dir, prostate_mask_file_pattern)
+    patient_test_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_test_data_dir)
+    patient_test_D_k_map, patient_test_K_map = generate_param_maps(patient_test_D_k_pred, patient_test_K_pred, patient_test_image_mask, th_gradient_strength, timestamp, target_dir, 8, "patient", "4", patient_test_prostate_mask_path, prostate_mask_file_pattern)
 
     print("Inference on test set completed.")
 
@@ -339,21 +352,25 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     patient_1_test_loss, patient_1_D_k_pred, patient_1_K_pred = val_test_model("Test", model, patient_1_dataloader, criterion, device)
     print(f"Patient 1 Test Loss: {patient_1_test_loss}")
 
-    patient_1_D_k_map, patient_1_K_map = generate_param_maps(patient_1_D_k_pred, patient_1_K_pred, patient_1_image_mask, th_gradient_strength, timestamp, 5, "patient", "1", patient_1_data_dir, prostate_mask_file_pattern)
+    patient_1_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_1_data_dir)
+    patient_1_D_k_map, patient_1_K_map = generate_param_maps(patient_1_D_k_pred, patient_1_K_pred, patient_1_image_mask, th_gradient_strength, timestamp, target_dir, 5, "patient", "1", patient_1_prostate_mask_path, prostate_mask_file_pattern)
 
     patient_2_test_loss, patient_2_D_k_pred, patient_2_K_pred = val_test_model("Test", model, patient_2_dataloader, criterion, device)
     print(f"Patient 2 Test Loss: {patient_2_test_loss}")
 
-    patient_2_D_k_map, patient_2_K_map = generate_param_maps(patient_2_D_k_pred, patient_2_K_pred, patient_2_image_mask, th_gradient_strength, timestamp, 7, "patient", "2", patient_2_data_dir, prostate_mask_file_pattern)
+    patient_2_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_2_data_dir)
+    patient_2_D_k_map, patient_2_K_map = generate_param_maps(patient_2_D_k_pred, patient_2_K_pred, patient_2_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "2", patient_2_prostate_mask_path, prostate_mask_file_pattern)
 
     patient_3_test_loss, patient_3_D_k_pred, patient_3_K_pred = val_test_model("Test", model, patient_3_dataloader, criterion, device)
     print(f"Patient 3 Test Loss: {patient_3_test_loss}")
 
-    patient_3_D_k_map, patient_3_K_map = generate_param_maps(patient_3_D_k_pred, patient_3_K_pred, patient_3_image_mask, th_gradient_strength, timestamp, 6, "patient", "3", patient_3_data_dir, prostate_mask_file_pattern)
+    patient_3_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_3_data_dir)
+    patient_3_D_k_map, patient_3_K_map = generate_param_maps(patient_3_D_k_pred, patient_3_K_pred, patient_3_image_mask, th_gradient_strength, timestamp, target_dir, 6, "patient", "3", patient_3_prostate_mask_path, prostate_mask_file_pattern)
 
     patient_5_test_loss, patient_5_D_k_pred, patient_5_K_pred = val_test_model("Test", model, patient_5_dataloader, criterion, device)
     print(f"Patient 5 Test Loss: {patient_5_test_loss}")
 
-    patient_5_D_k_map, patient_5_K_map = generate_param_maps(patient_5_D_k_pred, patient_5_K_pred, patient_5_image_mask, th_gradient_strength, timestamp, 7, "patient", "5", patient_5_data_dir, prostate_mask_file_pattern)
+    patient_5_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_5_data_dir)
+    patient_5_D_k_map, patient_5_K_map = generate_param_maps(patient_5_D_k_pred, patient_5_K_pred, patient_5_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "5", patient_5_prostate_mask_path, prostate_mask_file_pattern)
 
     print("Inference on individual patients completed.")

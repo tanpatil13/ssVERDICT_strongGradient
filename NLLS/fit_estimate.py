@@ -1,13 +1,19 @@
+import os
 import numpy as np
 from lmfit import Parameters, Minimizer
 from model import verdictResiduals
 from commons.preprocess_data import preprocess_images
 from postprocess_data import generate_param_maps
 
+def get_prostate_mask_path(grad_dataset_dir, prostate_mask_dir):
+    for subject_type, subject_ids in prostate_mask_dir.items():
+        for subject_id in subject_ids:
+            return os.path.join(grad_dataset_dir, subject_type, subject_id)
+
 def perform_fit(grad_dataset_dir, patient_data_dir,
                 image_file_pattern, x_bvec_file_pattern, y_bvec_file_pattern, z_bvec_file_pattern, 
                 Delta, delta, gradient_strength, prostate_mask_file_pattern,
-                th_bvals, th_gradient_strength, timestamp):
+                th_bvals, th_gradient_strength, timestamp, target_dir):
     """
     Preprocess the images, train the NLLS fitted VERDICT model, and test it.
     Generate the estimated parameter maps for f_ic, f_ees, f_vasc, and r for the specified patients.
@@ -23,6 +29,7 @@ def perform_fit(grad_dataset_dir, patient_data_dir,
         th_bvals: List of b-values in ms/µm^2.
         th_gradient_strength: Theoretical maximum gradient strength in mT/m.
         timestamp: Timestamp for saving model checkpoints and plots.
+        target_dir: Directory to save the outputs.
     """
     
     _,  patient_preprocessed_image_data, _, patient_image_mask = preprocess_images(patient_data_dir,
@@ -59,6 +66,13 @@ def perform_fit(grad_dataset_dir, patient_data_dir,
             is_success[i] = results.success
 
     param_data = np.column_stack((f_ic_pred, f_ees_pred, r_pred, resnorm, is_success))
-    np.savetxt(f"fitting_estimates/nlls_fit_patient_{th_gradient_strength}_{timestamp}.csv", param_data, delimiter=',', header='f_ic,f_ees,r,resnorm,is_success', comments='')
 
-    patient_f_ic_map, patient_f_ees_map, patient_r_map, patient_f_vasc_map, _ = generate_param_maps(f_ic_pred, f_ees_pred, r_pred, patient_image_mask, th_gradient_strength, 6, timestamp, "patient", "3", patient_data_dir, prostate_mask_file_pattern)
+    estimates_save_dir_path = "fitting_estimates"
+    if target_dir != "" and timestamp != "":
+        estimates_save_dir_path = target_dir + f"/model_output_directory/{timestamp}/fitting_estimates"
+    if not os.path.exists(estimates_save_dir_path):
+        os.makedirs(estimates_save_dir_path)
+    np.savetxt(f"{estimates_save_dir_path}/nlls_fit_patient_{th_gradient_strength}_{timestamp}.csv", param_data, delimiter=',', header='f_ic,f_ees,r,resnorm,is_success', comments='')
+
+    patient_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_data_dir)
+    patient_f_ic_map, patient_f_ees_map, patient_r_map, patient_f_vasc_map, _ = generate_param_maps(f_ic_pred, f_ees_pred, r_pred, patient_image_mask, th_gradient_strength, timestamp, target_dir, 6, "patient", "3", patient_prostate_mask_path, prostate_mask_file_pattern)

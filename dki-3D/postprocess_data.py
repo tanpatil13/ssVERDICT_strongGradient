@@ -3,7 +3,7 @@ import nibabel as nib
 import matplotlib, matplotlib.pyplot as plt
 from commons.preprocess_data import get_matched_files
 
-def plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_strength, timestamp, control_type,control_id=None, cmap='jet'):
+def plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_strength, timestamp, target_dir, control_type,control_id=None, cmap='jet'):
     """
     Plots the parameter maps for D_k, K, f_VASC, and R.
     Saves the plots as PNG files and the parameter maps as NIfTI files.
@@ -16,6 +16,7 @@ def plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_
     - th_gradient_strength: String indicating the gradient strength.
     - zslice: Integer index for the z-slice to visualize.
     - timestamp: String for the timestamp to use in file names.
+    - target_dir: Directory where the output files will be saved.
     - control_type: String indicating the type of control used.
     - control_id: Optional string indicating the control ID for specific patient.
     - cmap: Colormap to use for the plots.
@@ -71,7 +72,7 @@ def plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_
 
     RK_plot = ax[4].imshow(RK_map[:, :, zslice], cmap=cmap)
     plt.colorbar(RK_plot, ax=ax[4], fraction=0.046, pad=0.04)
-    RK_plot.set_clim(0, 4)
+    # RK_plot.set_clim(0, 4)
     ax[4].set_xlim(x_limit[0], x_limit[1])
     ax[4].set_ylim(y_limit[0], y_limit[1])
     ax[4].set_title('Radial Kurtosis (RK)')
@@ -82,25 +83,25 @@ def plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_
     plt.tight_layout()
     plt.show()
 
-    fig.savefig(timestamp + f'/ssDKI_3D_param_maps_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_param_maps_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
     MDsave = nib.Nifti1Image(MD_map, np.eye(4))
-    nib.save(MDsave, timestamp + f'/ssDKI_3D_MD_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(MDsave, target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_MD_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     FAsave = nib.Nifti1Image(FA_map, np.eye(4))
-    nib.save(FAsave, timestamp + f'/ssDKI_3D_FA_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(FAsave, target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_FA_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     MKsave = nib.Nifti1Image(MK_map, np.eye(4))
-    nib.save(MKsave, timestamp + f'/ssDKI_3D_MK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(MKsave, target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_MK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     AKsave = nib.Nifti1Image(AK_map, np.eye(4))
-    nib.save(AKsave, timestamp + f'/ssDKI_3D_AK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(AKsave, target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_AK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     RKsave = nib.Nifti1Image(RK_map, np.eye(4))
-    nib.save(RKsave, timestamp + f'/ssDKI_3D_RK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(RKsave, target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_RK_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
 
-def generate_param_maps(MD_pred, FA_pred, MK_pred, AK_pred, RK_pred, image_mask, th_gradient_strength, timestamp, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
+def generate_param_maps(MD_pred, FA_pred, MK_pred, AK_pred, RK_pred, image_mask, th_gradient_strength, timestamp, target_dir, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
     """
     Generates parameter voxel array from the predicted values of f_IC, f_EES, and R by normalizing and constraining them.
     Generates parameter maps by reshaping the flattened voxel arrays back to the original image dimensions using the image mask.
@@ -111,6 +112,8 @@ def generate_param_maps(MD_pred, FA_pred, MK_pred, AK_pred, RK_pred, image_mask,
     - image_mask: 3D numpy array representing the mask of the image.
     - th_gradient_strength: String indicating the gradient strength.
     - timestamp: String for the timestamp to use in file names.
+    - target_dir: Directory where the output files will be saved.
+    - zslice: Integer index for the z-slice to visualize.
     - control_type: String indicating the type of control used.
     - control_id: Optional string indicating the control ID for specific patient.
     - prostate_mask_dir: Directory containing the prostate mask file.
@@ -149,6 +152,7 @@ def generate_param_maps(MD_pred, FA_pred, MK_pred, AK_pred, RK_pred, image_mask,
     if prostate_mask_file_pattern and prostate_mask_dir:
         prostate_mask_file = get_matched_files(prostate_mask_dir, prostate_mask_file_pattern)
         prostate_mask = nib.load(prostate_mask_file).get_fdata()
+        prostate_mask = np.repeat(prostate_mask[:, :, np.newaxis], image_mask.shape[2], axis=2)
 
         MD_map = np.where(prostate_mask, MD_map, 0)
         MD_map = np.ma.masked_where(MD_map == 0, MD_map)
@@ -167,7 +171,7 @@ def generate_param_maps(MD_pred, FA_pred, MK_pred, AK_pred, RK_pred, image_mask,
 
         cmap.set_bad(color='white')
 
-    plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_strength, timestamp, control_type, control_id, cmap)
+    plot_param_maps(MD_map, FA_map, MK_map, AK_map, RK_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id, cmap)
 
     return MD_map, FA_map, MK_map, AK_map, RK_map
 

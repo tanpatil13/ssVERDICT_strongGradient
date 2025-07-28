@@ -3,7 +3,7 @@ import nibabel as nib
 import matplotlib, matplotlib.pyplot as plt
 from commons.preprocess_data import get_matched_files
 
-def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, control_type, control_id=None, cmap='jet'):
+def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id=None, cmap='jet'):
     """
     Plots the parameter maps for f_IC, f_EES, f_VASC, and R.
     Saves the plots as PNG files and the parameter maps as NIfTI files.
@@ -16,6 +16,7 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
     - zslice: Integer index for the z-slice to visualize.
     - th_gradient_strength: String indicating the gradient strength.
     - timestamp: String for the timestamp to use in file names.
+    - target_dir: Directory where the output files will be saved.
     - control_type: String indicating the type of control used.
     - control_id: Optional string indicating the control ID for specific patient.
     - cmap: Colormap to use for the plots.
@@ -39,7 +40,7 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
 
     f_ic_plot = ax[0].imshow(f_ic_map[:, :, zslice], cmap=cmap)
     plt.colorbar(f_ic_plot, ax=ax[0], fraction=0.046, pad=0.04)
-    f_ic_plot.set_clim(0, 1) 
+    # f_ic_plot.set_clim(0, 1) 
     ax[0].set_xlim(x_limit[0], x_limit[1])
     ax[0].set_ylim(y_limit[0], y_limit[1])
     ax[0].set_title('f_IC')
@@ -47,7 +48,7 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
 
     f_ees_plot = ax[1].imshow(f_ees_map[:, :, zslice], cmap=cmap)
     plt.colorbar(f_ees_plot, ax=ax[1], fraction=0.046, pad=0.04)
-    f_ees_plot.set_clim(0, 1)
+    # f_ees_plot.set_clim(0, 1)
     ax[1].set_xlim(x_limit[0], x_limit[1])
     ax[1].set_ylim(y_limit[0], y_limit[1])
     ax[1].set_title('f_EES')
@@ -55,7 +56,7 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
 
     f_vasc_plot = ax[2].imshow(f_vasc_map[:, :, zslice], cmap=cmap)
     plt.colorbar(f_vasc_plot, ax=ax[2], fraction=0.046, pad=0.04)
-    f_vasc_plot.set_clim(0, 0.2)
+    # f_vasc_plot.set_clim(0, 0.2)
     ax[2].set_xlim(x_limit[0], x_limit[1])
     ax[2].set_ylim(y_limit[0], y_limit[1])
     ax[2].set_title('f_VASC')
@@ -63,7 +64,7 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
 
     r_plot = ax[3].imshow(r_map[:, :, zslice], cmap=cmap)
     plt.colorbar(r_plot, ax=ax[3], fraction=0.046, pad=0.04)
-    r_plot.set_clim(0, 15)
+    # r_plot.set_clim(0, 15)
     ax[3].set_xlim(x_limit[0], x_limit[1])
     ax[3].set_ylim(y_limit[0], y_limit[1])
     ax[3].set_title('R')
@@ -72,21 +73,21 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
     plt.tight_layout()
     plt.show()
 
-    fig.savefig(timestamp + f'/ssVERDICT_NN_param_maps_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssVERDICT_NN_param_maps_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
     ficsave = nib.Nifti1Image(f_ic_map, np.eye(4))
-    nib.save(ficsave, timestamp + f'/ssVERDICT_NN_f_ic_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(ficsave, target_dir + '/model_output_directory/' + timestamp + f'/ssVERDICT_NN_f_ic_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     feessave = nib.Nifti1Image(f_ees_map, np.eye(4))
-    nib.save(feessave, timestamp + f'/ssVERDICT_NN_f_ees_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(feessave, target_dir + '/model_output_directory/' + timestamp + f'/ssVERDICT_NN_f_ees_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     fvascsave = nib.Nifti1Image(f_vasc_map, np.eye(4))
-    nib.save(fvascsave, timestamp + f'/ssVERDICT_NN_f_vasc_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(fvascsave, target_dir + '/model_output_directory/' + timestamp + f'/ssVERDICT_NN_f_vasc_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
     rsave = nib.Nifti1Image(r_map, np.eye(4))
-    nib.save(rsave, timestamp + f'/ssVERDICT_NN_r_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+    nib.save(rsave, target_dir + '/model_output_directory/' + timestamp + f'/ssVERDICT_NN_r_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
-def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_strength, timestamp, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
+def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_strength, timestamp, target_dir, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
     """
     Generates parameter voxel array from the predicted values of f_IC, f_EES, and R by normalizing and constraining them.
     Generates parameter maps by reshaping the flattened voxel arrays back to the original image dimensions using the image mask.
@@ -97,6 +98,8 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
     - image_mask: 3D numpy array representing the mask of the image.
     - th_gradient_strength: String indicating the gradient strength.
     - timestamp: String for the timestamp to use in file names.
+    - target_dir: Directory where the output files will be saved.
+    - zslice: Integer index for the z-slice to visualize.
     - control_type: String indicating the type of control used.
     - control_id: Optional string indicating the control ID for specific patient.
     - prostate_mask_dir: Directory containing the prostate mask file.
@@ -142,6 +145,7 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
     if prostate_mask_file_pattern and prostate_mask_dir:
         prostate_mask_file = get_matched_files(prostate_mask_dir, prostate_mask_file_pattern)
         prostate_mask = nib.load(prostate_mask_file).get_fdata()
+        prostate_mask = np.repeat(prostate_mask[:, :, np.newaxis], image_mask.shape[2], axis=2)
 
         f_ic_map = np.where(prostate_mask, f_ic_map, 0)
         f_ic_map = np.ma.masked_where(f_ic_map == 0, f_ic_map)
@@ -160,6 +164,6 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
 
         cmap.set_bad(color='white')
 
-    plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, control_type, control_id, cmap)
+    plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id, cmap)
 
     return f_ic_map, f_ees_map, f_vasc_map, r_map, cell_map
