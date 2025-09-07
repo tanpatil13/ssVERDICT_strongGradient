@@ -44,6 +44,10 @@ class ssVERDICT_NN(nn.Module):
             nn.PReLU(),
             nn.Linear(32, 64),
             nn.PReLU(),
+            nn.Linear(64, 128),
+            nn.PReLU(),
+            nn.Linear(128, 64),
+            nn.PReLU(),
             nn.Linear(64, 32),
             nn.PReLU(),
             nn.Dropout(0.2),
@@ -60,10 +64,12 @@ class ssVERDICT_NN(nn.Module):
         f_ic_min, f_ic_max = 0.001, 0.999
         f_ees_min, f_ees_max = 0.001, 0.999
         r_min, r_max = 0.001, 14.999
+        d_ees_min, d_ees_max = 0.5, 3.0
 
         f_ic = (f_ic_min + (f_ic_max - f_ic_min) * params[:, 0]).unsqueeze(1)
         f_ees = (f_ees_min + (f_ees_max - f_ees_min) * params[:, 1]).unsqueeze(1)
         r = (r_min + (r_max - r_min) * params[:, 2]).unsqueeze(1)
+        d_ees = (d_ees_min + (d_ees_max - d_ees_min) * params[:, 3]).unsqueeze(1)
         
         # sphere GPD approximation
         SPHERE_TRASCENDENTAL_ROOTS = np.r_[
@@ -77,7 +83,7 @@ class ssVERDICT_NN(nn.Module):
         87.94185005, 91.08422750, 94.22655255, 97.36883035
         ]
 
-        d_ees = 2
+        # d_ees = 2
         d_ic = 2
         d_vasc = 8
 
@@ -116,4 +122,4 @@ class ssVERDICT_NN(nn.Module):
         S_ees = f_ees * torch.exp(-b_values * d_ees)                              # ball compartment       
         S_pred = S_vasc + S_ic + S_ees
 
-        return S_pred, f_ic, f_ees, r
+        return S_pred, f_ic, f_ees, d_ees, r

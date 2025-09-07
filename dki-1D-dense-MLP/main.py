@@ -1,7 +1,8 @@
 import sys
 import numpy as np
+import torch
 import re
-from fit_estimate import perform_fit
+from train_validate import perform_training_inference
 
 def get_diffusion_parameters(th_bvals, gamma, th_gradient_strength):
     """
@@ -13,30 +14,51 @@ def get_diffusion_parameters(th_bvals, gamma, th_gradient_strength):
     """
     # Assign Delta and delta for 80mT/m gradient strength
     if (th_gradient_strength == 'G80'):
-        Delta = np.array([32]*len(th_bvals))  # in ms
-        delta = np.array([16]*len(th_bvals))  # in ms
+        Delta = torch.FloatTensor([32]*len(th_bvals))  # in ms
+        delta = torch.FloatTensor([16]*len(th_bvals))  # in ms
 
     # Assign Delta and delta for 40mT/m gradient strength
     elif (th_gradient_strength == 'G40'):
-        Delta = np.array([48]*len(th_bvals))  # in ms
-        delta = np.array([26]*len(th_bvals))  # in ms
+        Delta = torch.FloatTensor([48]*len(th_bvals))  # in ms
+        delta = torch.FloatTensor([26]*len(th_bvals))  # in ms
 
     # Assign Delta and delta for 300mT/m (default) gradient strength
     else:
-        Delta = np.array([25]*len(th_bvals))  # in ms
-        delta = np.array([5]*len(th_bvals))  # in ms
+        Delta = torch.FloatTensor([25]*len(th_bvals))  # in ms
+        delta = torch.FloatTensor([5]*len(th_bvals))  # in ms
     
-    gradient_strength = np.array([np.sqrt(th_bvals[i]/1000)/(gamma*delta[i]*np.sqrt(Delta[i]-delta[i]/3)) for i, _ in enumerate(th_bvals)])  # in mT/m
+    gradient_strength = torch.FloatTensor([np.sqrt(th_bvals[i]/1000)/(gamma*delta[i]*np.sqrt(Delta[i]-delta[i]/3)) for i, _ in enumerate(th_bvals)])  # in mT/m
 
     return Delta, delta, gradient_strength
 
 def main(timestamp, target_dir):
+    
+    train_data_dir = {
+        'healthy_control_data': ['240616-301', '171221-602'],
+        'patient_data': ['060622-601', '170622-601', '170622-602']
+    }
+    val_data_dir = {
+        'healthy_control_data': ['070322-601'],
+        'patient_data': ['230622-601']
+    }
 
-    patient_data_dir = {
+    healthy_test_data_dir = {
+        'healthy_control_data': ['100622-601']
+    }
+    patient_test_data_dir = {
         'patient_data': ['200722-601']
     }
 
-    healthy_data_dir = {
+    patient_1_data_dir = {
+        'patient_data': ['060622-601']
+    }
+    patient_2_data_dir = {
+        'patient_data': ['170622-601']
+    }
+    patient_3_data_dir = {
+        'patient_data': ['170622-602']
+    }
+    patient_5_data_dir = {
         'patient_data': ['230622-601']
     }
 
@@ -72,15 +94,20 @@ def main(timestamp, target_dir):
     Delta_G80, delta_G80, gradient_strength_G80 = get_diffusion_parameters(th_bvals, gamma, 'G80')
     Delta_G40, delta_G40, gradient_strength_G40 = get_diffusion_parameters(th_bvals, gamma, 'G40')
 
-    perform_fit(
+    perform_training_inference(
         grad_dataset_dir=grad_dataset_dir,
-        patient_data_dir=patient_data_dir,
-        healthy_data_dir=healthy_data_dir,
+        train_data_dir=train_data_dir,
+        val_data_dir=val_data_dir,
+        healthy_test_data_dir=healthy_test_data_dir,
+        patient_test_data_dir=patient_test_data_dir,
+        patient_1_data_dir=patient_1_data_dir,
+        patient_2_data_dir=patient_2_data_dir,
+        patient_3_data_dir=patient_3_data_dir,
+        patient_5_data_dir=patient_5_data_dir,
         image_file_pattern=image_G300_file_pattern,
         x_bvec_file_pattern=x_bvec_G300_file_pattern,
         y_bvec_file_pattern=y_bvec_G300_file_pattern,
         z_bvec_file_pattern=z_bvec_G300_file_pattern,
-        Delta=Delta_G300, delta=delta_G300, gradient_strength=gradient_strength_G300,
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G300',
@@ -88,15 +115,20 @@ def main(timestamp, target_dir):
         target_dir=target_dir
     )
 
-    perform_fit(
+    perform_training_inference(
         grad_dataset_dir=grad_dataset_dir,
-        patient_data_dir=patient_data_dir,
-        healthy_data_dir=healthy_data_dir,
+        train_data_dir=train_data_dir,
+        val_data_dir=val_data_dir,
+        healthy_test_data_dir=healthy_test_data_dir,
+        patient_test_data_dir=patient_test_data_dir,
+        patient_1_data_dir=patient_1_data_dir,
+        patient_2_data_dir=patient_2_data_dir,
+        patient_3_data_dir=patient_3_data_dir,
+        patient_5_data_dir=patient_5_data_dir,
         image_file_pattern=image_G80_file_pattern,
         x_bvec_file_pattern=x_bvec_G80_file_pattern,
         y_bvec_file_pattern=y_bvec_G80_file_pattern,
         z_bvec_file_pattern=z_bvec_G80_file_pattern,
-        Delta=Delta_G80, delta=delta_G80, gradient_strength=gradient_strength_G80,
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G80',
@@ -104,15 +136,20 @@ def main(timestamp, target_dir):
         target_dir=target_dir
     )
 
-    perform_fit(
+    perform_training_inference(
         grad_dataset_dir=grad_dataset_dir,
-        patient_data_dir=patient_data_dir,
-        healthy_data_dir=healthy_data_dir,
+        train_data_dir=train_data_dir,
+        val_data_dir=val_data_dir,
+        healthy_test_data_dir=healthy_test_data_dir,
+        patient_test_data_dir=patient_test_data_dir,
+        patient_1_data_dir=patient_1_data_dir,
+        patient_2_data_dir=patient_2_data_dir,
+        patient_3_data_dir=patient_3_data_dir,
+        patient_5_data_dir=patient_5_data_dir,
         image_file_pattern=image_G40_file_pattern,
         x_bvec_file_pattern=x_bvec_G40_file_pattern,
         y_bvec_file_pattern=y_bvec_G40_file_pattern,
         z_bvec_file_pattern=z_bvec_G40_file_pattern,
-        Delta=Delta_G40, delta=delta_G40, gradient_strength=gradient_strength_G40,
         prostate_mask_file_pattern=prostate_mask_file_pattern,
         th_bvals=th_bvals,
         th_gradient_strength='G40',

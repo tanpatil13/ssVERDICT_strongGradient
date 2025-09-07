@@ -247,6 +247,9 @@ def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, 
     plt.grid(True)
     plt.show()
 
+    train_val_loss_values = np.stack((train_losses, val_losses), axis=1)
+    np.savetxt(target_dir + '/model_output_directory/' + timestamp + f'/train_val_loss_values_{th_gradient_strength}_{timestamp}.csv', train_val_loss_values, delimiter=",", header="Train Loss,Validation Loss")
+
     plt.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_3D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
 def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, healthy_test_data_dir, patient_test_data_dir,

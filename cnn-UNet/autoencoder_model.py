@@ -5,19 +5,12 @@ class ConvLayers(nn.Module):
     """(Conv2d => BatchNorm => ReLU) x 4"""
     def __init__(self, in_channels, out_channels):
         super(ConvLayers, self).__init__()
-        hidden_channels = (in_channels + out_channels) // 2
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_channels), 
-            nn.PReLU(),
-            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_channels), 
-            nn.PReLU(),
-            nn.Conv2d(hidden_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels), 
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
             nn.PReLU(),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels), 
+            nn.BatchNorm2d(out_channels),
             nn.PReLU()
         )
 
@@ -73,13 +66,11 @@ class ssVERDICT_UNet(nn.Module):
         d4 = self.down4(self.pool3(d3))
 
         bn = self.bottleneck(self.pool4(d4))
-        # bn = self.bottleneck(self.pool3(d3))
 
         u4 = self.up4(bn)
         u4 = self.conv4(torch.cat([u4, d4], dim=1))
 
         u3 = self.up3(u4)
-        # u3 = self.up3(bn)
         u3 = self.conv3(torch.cat([u3, d3], dim=1))
 
         u2 = self.up2(u3)
@@ -95,17 +86,20 @@ class ssVERDICT_UNet(nn.Module):
         f_ic_min, f_ic_max = 0.001, 0.999
         f_ees_min, f_ees_max = 0.001, 0.999
         r_min, r_max = 0.001, 14.999
+        d_ees_min, d_ees_max = 0.5, 3.0
 
         f_ic = f_ic_min + (f_ic_max - f_ic_min) * params[:, 0, :, :]
         f_ees = f_ees_min + (f_ees_max - f_ees_min) * params[:, 1, :, :]
         r = r_min + (r_max - r_min) * params[:, 2, :, :]
+        d_ees = d_ees_min + (d_ees_max - d_ees_min) * params[:, 3, :, :]
 
         # Get the spatial dimensions of the image
         img_dim = f_ic.shape
         f_ic_ = f_ic.reshape(img_dim[0], img_dim[1]*img_dim[2]).unsqueeze(1)
         f_ees_ = f_ees.reshape(img_dim[0], img_dim[1]*img_dim[2]).unsqueeze(1)
         r_ = r.reshape(img_dim[0], img_dim[1]*img_dim[2]).unsqueeze(1)
-    
+        d_ees_ = d_ees.reshape(img_dim[0], img_dim[1]*img_dim[2]).unsqueeze(1)
+
         # sphere GPD approximation
         SPHERE_TRASCENDENTAL_ROOTS = np.r_[
         2.081575978, 5.940369990, 9.205840145,
@@ -118,7 +112,7 @@ class ssVERDICT_UNet(nn.Module):
         87.94185005, 91.08422750, 94.22655255, 97.36883035
         ]
 
-        d_ees = 2
+        # d_ees = 2
         d_ic = 2
         d_vasc = 8
 
@@ -154,9 +148,9 @@ class ssVERDICT_UNet(nn.Module):
         S_vasc = (1 - f_ic_ - f_ees_) * ((torch.sqrt(pi_tensor) * torch.erf(torch.sqrt(b_values * d_vasc))) /
                 (2 * torch.sqrt(b_values * d_vasc))).unsqueeze(0).unsqueeze(2)                                  # astrosticks compartment
         S_ic = f_ic_ * torch.exp(first_factor * torch.sum(summands, 2))                                         # sphere compartment
-        S_ees = f_ees_ * torch.exp(-b_values * d_ees).unsqueeze(0).unsqueeze(2)                                 # ball compartment       
+        S_ees = f_ees_ * torch.exp(-b_values.unsqueeze(0).unsqueeze(2) * d_ees_)                                # ball compartment
         S_pred = S_vasc + S_ic + S_ees
 
         S_pred = S_pred.reshape(img_dim[0], S_pred.size(1), img_dim[1], img_dim[2])
 
-        return S_pred, f_ic, f_ees, r
+        return S_pred, f_ic, f_ees, d_ees, r

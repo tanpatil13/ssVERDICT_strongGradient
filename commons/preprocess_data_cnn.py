@@ -12,12 +12,14 @@ def get_matched_files(data_dir, pattern):
     return None
 
 
-def load_nifti_image(path):
+def load_nifti_image(path, rotate=True):
     """
     Loads the nifti image from the given path and returns the image data.
     """
     imgnii = nib.load(path)
-    imgdata = np.rot90(imgnii.get_fdata())
+    imgdata = imgnii.get_fdata()
+    if rotate:
+        imgdata = np.rot90(imgdata)
     return imgdata
 
 
@@ -85,7 +87,7 @@ def calculate_closest_idx(th_data, ac_data):
 
 def preprocess_images(split_data_dir, grad_dataset_dir,
                       image_file_pattern, x_bvec_file_pattern, y_bvec_file_pattern, z_bvec_file_pattern,
-                      th_bvals):
+                      prostate_mask_file_pattern, th_bvals):
     """
     Preprocesses the images in the given split data directory.
     It loads the images, calculates the actual b-values, normalizes the images, flattens them,
@@ -93,6 +95,7 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
     """
 
     preprocessed_image_data = []
+    prostate_masks = []
 
     for subject_type, subject_ids in split_data_dir.items():
         for subject_id in subject_ids:
@@ -103,6 +106,8 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             x_bvec_file = get_matched_files(nii_gz_path, x_bvec_file_pattern)
             y_bvec_file = get_matched_files(nii_gz_path, y_bvec_file_pattern)
             z_bvec_file = get_matched_files(nii_gz_path, z_bvec_file_pattern)
+
+            prostate_mask_file = get_matched_files(nii_gz_path, prostate_mask_file_pattern)
             
             if not all([image_file, x_bvec_file, y_bvec_file, z_bvec_file]):
                 print(f"Missing files for {subject_type} {subject_id}")
@@ -114,6 +119,10 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
             z_bvec_data = load_nifti_image(z_bvec_file)
 
             image_dim = image_data.shape
+
+            prostate_mask_data = load_nifti_image(prostate_mask_file, rotate=False)
+            prostate_mask_data = np.repeat(prostate_mask_data[:, :, np.newaxis], image_dim[2], axis=2)
+
             image_mask = get_image_mask(image_data)
 
             ac_bvals = calculate_actual_bvals(x_bvec_data, y_bvec_data, z_bvec_data)
@@ -140,9 +149,14 @@ def preprocess_images(split_data_dir, grad_dataset_dir,
 
             norm_avg_image_data = np.clip(norm_avg_image_data, None, 1-(1e-6))
             preprocessed_image_data.append(norm_avg_image_data)
+            prostate_masks.append(prostate_mask_data)
 
     preprocessed_image_data = np.array(preprocessed_image_data)
     preprocessed_image_data = np.concatenate(preprocessed_image_data, axis=2)
     preprocessed_image_data = np.transpose(preprocessed_image_data, (2, 3, 0, 1)) # Change to (num_slices, num_vols, num_vox_x, num_vox_y)
 
-    return ac_bvals, preprocessed_image_data, image_dim, image_mask
+    prostate_masks = np.concatenate(prostate_masks, axis=2)
+    prostate_masks = np.transpose(prostate_masks, (2, 0, 1))
+    prostate_masks = np.expand_dims(prostate_masks, axis=1)
+
+    return ac_bvals, preprocessed_image_data, image_dim, prostate_masks

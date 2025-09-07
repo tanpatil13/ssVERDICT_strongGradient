@@ -33,7 +33,7 @@ def get_diffusion_parameters(th_bvals, gamma, th_gradient_strength):
 def main(timestamp, target_dir):
 
     patient_data_dir = {
-        'patient_data': ['200722-601']
+        'patient_data': ['170622-602']
     }
 
     healthy_data_dir = {

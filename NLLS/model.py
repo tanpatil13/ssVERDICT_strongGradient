@@ -5,6 +5,7 @@ def computeVerdictSignal(params, b_values, Delta, delta, gradient_strength):
     f_ic = params['f_ic'].value
     f_ees = params['f_ees'].value
     r = params['r'].value
+    d_ees = params['d_ees'].value
 
     SPHERE_TRASCENDENTAL_ROOTS = np.r_[
         2.081575978, 5.940369990, 9.205840145,
@@ -16,7 +17,8 @@ def computeVerdictSignal(params, b_values, Delta, delta, gradient_strength):
         75.37168540, 78.51434055, 81.65691380, 84.79941440,
         87.94185005, 91.08422750, 94.22655255, 97.36883035]
     
-    d_ees, d_ic, d_vasc = 2, 2, 8
+    # d_ees = 2
+    d_ic, d_vasc = 2, 8
     alpha = SPHERE_TRASCENDENTAL_ROOTS / r
     alpha2 = alpha ** 2
     alpha2D = alpha2 * d_ic

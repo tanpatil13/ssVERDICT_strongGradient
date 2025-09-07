@@ -58,9 +58,10 @@ class ssVERDICT_NN(nn.Module):
         params = self.encoder(X)
 
         # constrain parameters to biophysically-realistic ranges
-        f_ic = torch.clamp(params[:,0].unsqueeze(1), min=0.001, max=0.999)
-        f_ees = torch.clamp(params[:,1].unsqueeze(1), min=0.001, max=0.999)
-        r = torch.clamp(params[:,2].unsqueeze(1), min=0.001, max=14.999)
+        f_ic = torch.clamp(params[:, 0].unsqueeze(1), min=0.001, max=0.999)
+        f_ees = torch.clamp(params[:, 1].unsqueeze(1), min=0.001, max=0.999)
+        r = torch.clamp(params[:, 2].unsqueeze(1), min=0.001, max=14.999)
+        d_ees = torch.clamp(params[:, 3].unsqueeze(1), min=0.5, max=3.0)
         
         # sphere GPD approximation
         SPHERE_TRASCENDENTAL_ROOTS = np.r_[
@@ -74,7 +75,7 @@ class ssVERDICT_NN(nn.Module):
         87.94185005, 91.08422750, 94.22655255, 97.36883035
         ]
 
-        d_ees = 2
+        # d_ees = 2
         d_ic = 2
         d_vasc = 8
 
@@ -113,4 +114,4 @@ class ssVERDICT_NN(nn.Module):
         S_ees = f_ees * torch.exp(-b_values * d_ees)                              # ball compartment       
         X = S_vasc + S_ic + S_ees
 
-        return X, f_ic, f_ees, r
+        return X, f_ic, f_ees, d_ees, r

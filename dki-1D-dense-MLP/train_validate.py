@@ -127,7 +127,7 @@ def val_test_model(split_type, model, val_test_dataloader, criterion, device='cu
 
     return epoch_val_test_loss, all_D_k_pred, all_K_pred
 
-def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", scheduler=None, target_dir=""):
+def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, num_epochs='30', device='cuda', timestamp="", th_gradient_strength="", scheduler=None, target_dir=""):
     """
     Train the self-supervised autoencoder model.
     Validate the model on the validation dataset after each epoch.
@@ -179,7 +179,7 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
         if not os.path.exists(model_save_dir_path):
             os.makedirs(model_save_dir_path)
 
-        best_checkpoint_path = f"{model_save_dir_path}/ssVERDICT_checkpoint_best_epoch_{timestamp}.pth"
+        best_checkpoint_path = f"{model_save_dir_path}/ssDKI_checkpoint_best_epoch_{th_gradient_strength}_{timestamp}.pth"
         if epoch_val_loss < best_val_loss:
             best_val_loss = epoch_val_loss
             best_val_D_k_pred, best_val_K_pred = val_D_k_pred, val_K_pred
@@ -194,14 +194,14 @@ def train_model(model, train_dataloader, val_dataloader, criterion, optimizer, n
             }
             best_epoch = epoch + 1
 
-        epoch_checkpoint_path = f"{model_save_dir_path}/ssVERDICT_checkpoint_epoch_{epoch+1}_{timestamp}.pth"
-        if (epoch + 1) % 5 == 0:
-            best_val_loss = epoch_val_loss
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
-            }, epoch_checkpoint_path)
+        # epoch_checkpoint_path = f"{model_save_dir_path}/ssVERDICT_checkpoint_epoch_{epoch+1}_{timestamp}.pth"
+        # if (epoch + 1) % 5 == 0:
+        #     best_val_loss = epoch_val_loss
+        #     torch.save({
+        #         'epoch': epoch,
+        #         'model_state_dict': model.state_dict(),
+        #         'optimizer_state_dict': optimizer.state_dict()
+        #     }, epoch_checkpoint_path)
         
         if scheduler is not None:
             scheduler.step()
@@ -229,7 +229,10 @@ def plot_loss_curves(train_losses, val_losses, th_gradient_strength, timestamp, 
     plt.grid(True)
     plt.show()
 
-    plt.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_1D_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    train_val_loss_values = np.stack((train_losses, val_losses), axis=1)
+    np.savetxt(target_dir + '/model_output_directory/' + timestamp + f'/train_val_loss_values_{th_gradient_strength}_{timestamp}.csv', train_val_loss_values, delimiter=",", header="Train Loss,Validation Loss")
+
+    plt.savefig(target_dir + '/model_output_directory/' + timestamp + f'/ssDKI_1D_denseMLP_train_val_loss_curves_{th_gradient_strength}_{timestamp}.png', dpi=300, bbox_inches='tight')
 
 def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, healthy_test_data_dir, patient_test_data_dir,
                                 patient_1_data_dir, patient_2_data_dir, patient_3_data_dir, patient_5_data_dir,
@@ -258,24 +261,27 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
 
     _, train_preprocessed_image_data, _, train_image_mask = preprocess_images(train_data_dir,
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                            y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                            y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
 
     _, val_preprocessed_image_data, _, val_image_mask = preprocess_images(val_data_dir,
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                            y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                            y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
 
     _, healthy_test_preprocessed_image_data, _, healthy_test_image_mask = preprocess_images(healthy_test_data_dir,
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                            y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                            y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
 
     _, patient_test_preprocessed_image_data, _, patient_test_image_mask = preprocess_images(patient_test_data_dir,
                                                             grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                            y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                            y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
 
-    num_epochs = 30
-    lr = 1e-3
+    num_epochs = 60
+    lr = 1e-2
     nparams = 2
-    batch_size = 256
+    batch_size = 64
+
+    if th_gradient_strength == 'G40':
+        batch_size = 128
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -302,6 +308,7 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
         num_epochs=num_epochs,
         device=device,
         timestamp=timestamp,
+        th_gradient_strength=th_gradient_strength,
         scheduler=scheduler,
         target_dir=target_dir
     )
@@ -319,7 +326,8 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
     healthy_test_loss, healthy_test_D_k_pred, healthy_test_K_pred = val_test_model("Test", model, healthy_test_dataloader, criterion, device)
     print(f"Healthy Control Test Loss: {healthy_test_loss}")
 
-    healthy_test_D_k_map, healthy_test_K_map = generate_param_maps(healthy_test_D_k_pred, healthy_test_K_pred, healthy_test_image_mask, th_gradient_strength, timestamp, target_dir, 7, "healthy")
+    healthy_test_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, healthy_test_data_dir)
+    healthy_test_D_k_map, healthy_test_K_map = generate_param_maps(healthy_test_D_k_pred, healthy_test_K_pred, healthy_test_image_mask, th_gradient_strength, timestamp, target_dir, 7, "healthy", "4", healthy_test_prostate_mask_path, prostate_mask_file_pattern)
 
     patient_test_loss, patient_test_D_k_pred, patient_test_K_pred = val_test_model("Test", model, patient_test_dataloader, criterion, device)
     print(f"Patient Test Loss: {patient_test_loss}")
@@ -333,17 +341,17 @@ def perform_training_inference(grad_dataset_dir, train_data_dir, val_data_dir, h
 
     _, patient_1_preprocessed_image_data, _, patient_1_image_mask = preprocess_images(patient_1_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                                y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                                y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
     _, patient_2_preprocessed_image_data, _, patient_2_image_mask = preprocess_images(patient_2_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                                y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                                y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
     _, patient_3_preprocessed_image_data, _, patient_3_image_mask = preprocess_images(patient_3_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                                y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
+                                                                y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
     _, patient_5_preprocessed_image_data, _, patient_5_image_mask = preprocess_images(patient_5_data_dir,
                                                                 grad_dataset_dir, image_file_pattern, x_bvec_file_pattern, 
-                                                                y_bvec_file_pattern, z_bvec_file_pattern, th_bvals)
-    
+                                                                y_bvec_file_pattern, z_bvec_file_pattern, prostate_mask_file_pattern, th_bvals)
+
     patient_1_dataloader = create_single_dataloader(patient_1_preprocessed_image_data, batch_size)
     patient_2_dataloader = create_single_dataloader(patient_2_preprocessed_image_data, batch_size)
     patient_3_dataloader = create_single_dataloader(patient_3_preprocessed_image_data, batch_size)

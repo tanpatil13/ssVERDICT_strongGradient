@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from lmfit import Parameters, Minimizer
-from model import verdictResiduals
+from model import dkiResiduals
 from commons.preprocess_data import preprocess_images
 from postprocess_data import generate_param_maps
 
@@ -43,18 +43,14 @@ def perform_fit(grad_dataset_dir, patient_data_dir, healthy_data_dir,
     num_itr = 1
 
     patient_img_dim = patient_preprocessed_image_data.shape
-    patient_f_ic_pred = np.zeros(patient_img_dim[0])
-    patient_f_ees_pred = np.zeros(patient_img_dim[0])
-    patient_r_pred = np.zeros(patient_img_dim[0])
-    patient_d_ees_pred = np.zeros(patient_img_dim[0])
+    patient_D_k_pred = np.zeros(patient_img_dim[0])
+    patient_K_pred = np.zeros(patient_img_dim[0])
     patient_resnorm = np.zeros(patient_img_dim[0])
     patient_is_success = np.zeros(patient_img_dim[0], dtype=bool)
 
     healthy_img_dim = healthy_preprocessed_image_data.shape
-    healthy_f_ic_pred = np.zeros(healthy_img_dim[0])
-    healthy_f_ees_pred = np.zeros(healthy_img_dim[0])
-    healthy_r_pred = np.zeros(healthy_img_dim[0])
-    healthy_d_ees_pred = np.zeros(healthy_img_dim[0])
+    healthy_D_k_pred = np.zeros(healthy_img_dim[0])
+    healthy_K_pred = np.zeros(healthy_img_dim[0])
     healthy_resnorm = np.zeros(healthy_img_dim[0])
     healthy_is_success = np.zeros(healthy_img_dim[0], dtype=bool)
 
@@ -64,58 +60,50 @@ def perform_fit(grad_dataset_dir, patient_data_dir, healthy_data_dir,
 
     th_bvals_scaled = [th_bvals[i]/1000 for i in range(len(th_bvals))]  # Convert to ms/µm^2
 
-    print(f"Running the VERDICT NLLS fitting on the patient data for gradient strength: {th_gradient_strength} ...")
+    print(f"Running the DKI NLLS fitting on the patient data for gradient strength: {th_gradient_strength} ...")
 
     for i in range(patient_img_dim[0]):
         patient_params = Parameters()
-        patient_params.add('f_ic', value=0.5, min=0.001, max=0.999)
-        patient_params.add('f_ees', value=0.5, min=0.001, max=0.999)
-        patient_params.add('r', value=7.5, min=0.001, max=14.999)
-        patient_params.add('d_ees', value=1.75, min=0.5, max=3.0)
+        patient_params.add('D_k', value=1.35, min=0.2, max=2.5)
+        patient_params.add('K', value=1.75, min=0, max=3.5)
 
         for k in range(num_itr):
-            patient_fitter = Minimizer(verdictResiduals, patient_params, fcn_args=(patient_preprocessed_image_data[i, :], th_bvals_scaled, Delta, delta, gradient_strength))
+            patient_fitter = Minimizer(dkiResiduals, patient_params, fcn_args=(patient_preprocessed_image_data[i, :], th_bvals_scaled))
             patient_results = patient_fitter.minimize(method='leastsq')
-            patient_f_ic_pred[i] = patient_results.params['f_ic'].value
-            patient_f_ees_pred[i] = patient_results.params['f_ees'].value
-            patient_r_pred[i] = patient_results.params['r'].value
-            patient_d_ees_pred[i] = patient_results.params['d_ees'].value
+            patient_D_k_pred[i] = patient_results.params['D_k'].value
+            patient_K_pred[i] = patient_results.params['K'].value
             patient_resnorm[i] = patient_results.chisqr
             patient_is_success[i] = patient_results.success
 
-    patient_param_data = np.column_stack((patient_f_ic_pred, patient_f_ees_pred, patient_r_pred, patient_resnorm, patient_is_success))
+    patient_param_data = np.column_stack((patient_D_k_pred, patient_K_pred, patient_resnorm, patient_is_success))
 
-    print(f"Running the VERDICT NLLS fitting on the healthy control data for gradient strength: {th_gradient_strength} ...")
+    print(f"Running the DKI NLLS fitting on the healthy control data for gradient strength: {th_gradient_strength} ...")
 
     for i in range(healthy_img_dim[0]):
         healthy_params = Parameters()
-        healthy_params.add('f_ic', value=0.5, min=0.001, max=0.999)
-        healthy_params.add('f_ees', value=0.5, min=0.001, max=0.999)
-        healthy_params.add('r', value=7.5, min=0.001, max=14.999)
-        healthy_params.add('d_ees', value=1.75, min=0.5, max=3.0)
+        healthy_params.add('D_k', value=1.35, min=0.2, max=2.7)
+        healthy_params.add('K', value=1.75, min=0, max=3.5)
 
         for k in range(num_itr):
-            healthy_fitter = Minimizer(verdictResiduals, healthy_params, fcn_args=(healthy_preprocessed_image_data[i, :], th_bvals_scaled, Delta, delta, gradient_strength))
+            healthy_fitter = Minimizer(dkiResiduals, healthy_params, fcn_args=(healthy_preprocessed_image_data[i, :], th_bvals_scaled))
             healthy_results = healthy_fitter.minimize(method='leastsq')
-            healthy_f_ic_pred[i] = healthy_results.params['f_ic'].value
-            healthy_f_ees_pred[i] = healthy_results.params['f_ees'].value
-            healthy_r_pred[i] = healthy_results.params['r'].value
-            healthy_d_ees_pred[i] = healthy_results.params['d_ees'].value
+            healthy_D_k_pred[i] = healthy_results.params['D_k'].value
+            healthy_K_pred[i] = healthy_results.params['K'].value
             healthy_resnorm[i] = healthy_results.chisqr
             healthy_is_success[i] = healthy_results.success
 
-    healthy_param_data = np.column_stack((healthy_f_ic_pred, healthy_f_ees_pred, healthy_r_pred, healthy_resnorm, healthy_is_success))
+    healthy_param_data = np.column_stack((healthy_D_k_pred, healthy_K_pred, healthy_resnorm, healthy_is_success))
 
     estimates_save_dir_path = "fitting_estimates"
     if target_dir != "" and timestamp != "":
         estimates_save_dir_path = target_dir + f"/model_output_directory/{timestamp}/fitting_estimates"
     if not os.path.exists(estimates_save_dir_path):
         os.makedirs(estimates_save_dir_path)
-    np.savetxt(f"{estimates_save_dir_path}/nlls_fit_patient_4_{th_gradient_strength}_{timestamp}.csv", patient_param_data, delimiter=',', header='f_ic,f_ees,r,resnorm,is_success', comments='')
-    np.savetxt(f"{estimates_save_dir_path}/nlls_fit_patient_5_{th_gradient_strength}_{timestamp}.csv", healthy_param_data, delimiter=',', header='f_ic,f_ees,r,resnorm,is_success', comments='')
+    np.savetxt(f"{estimates_save_dir_path}/dki_nlls_fit_patient_3_{th_gradient_strength}_{timestamp}.csv", patient_param_data, delimiter=',', header='D_k,K,resnorm,is_success', comments='')
+    np.savetxt(f"{estimates_save_dir_path}/dki_nlls_fit_patient_5_{th_gradient_strength}_{timestamp}.csv", healthy_param_data, delimiter=',', header='D_k,K,resnorm,is_success', comments='')
 
     patient_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, patient_data_dir)
-    patient_f_ic_map, patient_f_ees_map, patient_f_vasc_map, patient_d_ees_map, patient_r_map, _ = generate_param_maps(patient_f_ic_pred, patient_f_ees_pred, patient_d_ees_pred, patient_r_pred, patient_image_mask, th_gradient_strength, timestamp, target_dir, 8, "patient", "4", patient_prostate_mask_path, prostate_mask_file_pattern)
+    patient_D_k_map, patient_K_map = generate_param_maps(patient_D_k_pred, patient_K_pred, patient_image_mask, th_gradient_strength, timestamp, target_dir, 6, "patient", "3", patient_prostate_mask_path, prostate_mask_file_pattern)
 
     healthy_prostate_mask_path = get_prostate_mask_path(grad_dataset_dir, healthy_data_dir)
-    healthy_f_ic_map, healthy_f_ees_map, healthy_f_vasc_map, healthy_d_ees_map, healthy_r_map, _ = generate_param_maps(healthy_f_ic_pred, healthy_f_ees_pred, healthy_d_ees_pred, healthy_r_pred, healthy_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "5", healthy_prostate_mask_path, prostate_mask_file_pattern)
+    healthy_D_k_map, healthy_K_map = generate_param_maps(healthy_D_k_pred, healthy_K_pred, healthy_image_mask, th_gradient_strength, timestamp, target_dir, 7, "patient", "5", healthy_prostate_mask_path, prostate_mask_file_pattern)

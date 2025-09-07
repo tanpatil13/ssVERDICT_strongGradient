@@ -3,7 +3,7 @@ import nibabel as nib
 import matplotlib, matplotlib.pyplot as plt
 from commons.preprocess_data import get_matched_files
 
-def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id=None, cmap='jet'):
+def plot_param_maps(f_ic_map, f_ees_map, d_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id=None, cmap='jet'):
     """
     Plots the parameter maps for f_IC, f_EES, f_VASC, and R.
     Saves the plots as PNG files and the parameter maps as NIfTI files.
@@ -21,8 +21,8 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
     - control_id: Optional string indicating the control ID for specific patient.
     - cmap: Colormap to use for the plots.
     """
-    
-    fig, ax = plt.subplots(2, 2, figsize=(20, 10))
+
+    fig, ax = plt.subplots(3, 2, figsize=(20, 15))
     ax = ax.flatten()
 
     x_limit = (50, 110)
@@ -70,6 +70,16 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
     ax[3].set_title('R')
     ax[3].axis('off')
 
+    d_ees_plot = ax[4].imshow(d_ees_map[:, :, zslice], cmap=cmap)
+    plt.colorbar(d_ees_plot, ax=ax[4], fraction=0.046, pad=0.04)
+    # d_ees_plot.set_clim(0, 1)
+    ax[4].set_xlim(x_limit[0], x_limit[1])
+    ax[4].set_ylim(y_limit[0], y_limit[1])
+    ax[4].set_title('d_EES')
+    ax[4].axis('off')
+
+    ax[5].axis('off')
+
     plt.tight_layout()
     plt.show()
 
@@ -84,10 +94,13 @@ def plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th
     fvascsave = nib.Nifti1Image(f_vasc_map, np.eye(4))
     nib.save(fvascsave, target_dir + '/model_output_directory/' + timestamp + f'/VERDICT_NLLS_f_vasc_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
+    deessave = nib.Nifti1Image(d_ees_map, np.eye(4))
+    nib.save(deessave, target_dir + '/model_output_directory/' + timestamp + f'/VERDICT_NLLS_d_ees_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
+
     rsave = nib.Nifti1Image(r_map, np.eye(4))
     nib.save(rsave, target_dir + '/model_output_directory/' + timestamp + f'/VERDICT_NLLS_r_{control_type}_{control_id}_{th_gradient_strength}_{timestamp}.nii.gz')
 
-def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_strength, timestamp, target_dir, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
+def generate_param_maps(f_ic_pred, f_ees_pred, d_ees_pred, r_pred, image_mask, th_gradient_strength, timestamp, target_dir, zslice, control_type, control_id=None, prostate_mask_dir=None, prostate_mask_file_pattern=None):
     """
     Generates parameter voxel array from the predicted values of f_IC, f_EES, and R by normalizing and constraining them.
     Generates parameter maps by reshaping the flattened voxel arrays back to the original image dimensions using the image mask.
@@ -108,6 +121,7 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
 
     f_ic = np.array(f_ic_pred)
     f_ees = np.array(f_ees_pred)
+    d_ees = np.array(d_ees_pred)
     r = np.array(r_pred)
 
     f_vasc = 1 - f_ic - f_ees
@@ -135,6 +149,10 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
     f_vasc_vox[mask_vox == 1] = np.squeeze(f_vasc)
     f_vasc_map = f_vasc_vox.reshape(image_mask.shape)
 
+    d_ees_vox = np.zeros_like(mask_vox)
+    d_ees_vox[mask_vox == 1] = np.squeeze(d_ees)
+    d_ees_map = d_ees_vox.reshape(image_mask.shape)
+
     r_vox = np.zeros_like(mask_vox)
     r_vox[mask_vox == 1] = np.squeeze(r)
     r_map = r_vox.reshape(image_mask.shape)
@@ -158,6 +176,9 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
         f_vasc_map = np.where(prostate_mask, f_vasc_map, 0)
         f_vasc_map = np.ma.masked_where(f_vasc_map == 0, f_vasc_map)
 
+        d_ees_map = np.where(prostate_mask, d_ees_map, 0)
+        d_ees_map = np.ma.masked_where(d_ees_map == 0, d_ees_map)
+
         r_map = np.where(prostate_mask, r_map, 0)
         r_map = np.ma.masked_where(r_map == 0, r_map)
 
@@ -166,6 +187,6 @@ def generate_param_maps(f_ic_pred, f_ees_pred, r_pred, image_mask, th_gradient_s
 
         cmap.set_bad(color='white')
 
-    plot_param_maps(f_ic_map, f_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id, cmap)
+    plot_param_maps(f_ic_map, f_ees_map, d_ees_map, r_map, f_vasc_map, cell_map, zslice, th_gradient_strength, timestamp, target_dir, control_type, control_id, cmap)
 
-    return f_ic_map, f_ees_map, f_vasc_map, r_map, cell_map
+    return f_ic_map, f_ees_map, f_vasc_map, d_ees_map, r_map, cell_map
