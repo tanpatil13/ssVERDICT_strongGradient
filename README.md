@@ -1,4 +1,4 @@
-# ssVERDICT: Self-Supervised VERDICT-MRI for Enhanced Prostate Tumour Characterisation
+# Self-Supervised Learning for Microstructural MRI: Enhancing Prostate Cancer Tumour Characterization with Ultra-Strong Gradient dMRI
 
 This code extends the work discussed in the publication ssVERDICT: Self-Supervised VERDICT-MRI for Enhanced Prostate Tumour Characterisation by Snigdha Sen et al.
 
