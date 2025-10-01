@@ -9,7 +9,7 @@ There are six directories each pertaining to a fitting strategy, i.e. different 
 4) NLLS: VERDICT model fitted using the non-linear least square based Levenberg-Marquardt method
 5) dki-1D-NLLS: 1-dimensional DKI fitted using the non-linear least square based Levenberg-Marquardt method
 6) dki-1D-baseline: 1-dimensional DKI fitted using the baseline autoencoder architecture discussed in the above-mentioned publication
-7) dki-1D-baseline: 1-dimensional DKI fitted using a more complex self-supervised MLP architecture than the baseline model
+7) dki-1D-dense-MLP: 1-dimensional DKI fitted using a more complex self-supervised MLP architecture than the baseline model
 8) dki-3D: 3-dimensional DKI fitted using a self-supervised MLP architecture
 
 To run the training and inference pipeline, and generate the biomarker parameter maps:
