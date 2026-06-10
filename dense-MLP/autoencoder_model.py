@@ -97,7 +97,7 @@ class ssVERDICT_NN(nn.Module):
         alpha2D = alpha2D.unsqueeze(1)
 
         gamma = 2.675987e2
-        first_factor = -2*(gamma*self.gradient_strength)**2 / 2
+        first_factor = -2*(gamma*self.gradient_strength)**2 / d_ic
 
         delta = self.delta.unsqueeze(0).unsqueeze(2)
         Delta = self.Delta.unsqueeze(0).unsqueeze(2)
