@@ -32,7 +32,7 @@ def computeVerdictSignal(params, b_values, Delta, delta, gradient_strength):
 
 
     gamma = 2.675987e2
-    first_factor = -2 * (gamma *  gradient_strength) **2 / 2
+    first_factor = -2 * (gamma *  gradient_strength) **2 / d_ic
 
     summands = (alpha ** (-4) / (alpha2 * r**2 - 2) * (
                             2 * delta - (
